@@ -1,0 +1,9 @@
+# Ignore everything in config
+*
+
+# But not these files...
+!.gitignore
+!.gitkeep
+
+# ...even if they are in subdirectories
+!*/
