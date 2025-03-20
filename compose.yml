@@ -88,6 +88,52 @@ services:
       - 6881:6881/tcp
       - 6881:6881/udp
     restart: unless-stopped
+  postgres:
+    image: postgres:15
+    hostname: postgres
+    environment:
+      PGUSER: mealie
+      POSTGRES_USER: mealie
+      POSTGRES_PASSWORD: pass@123
+    volumes:
+      - ./config/mealie/pgdata:/var/lib/postgresql/data
+    networks:
+      - bridge_net_1
+    ports:
+      - 7005:5432
+    healthcheck:
+      test: ["CMD", "pg_isready"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
+  mealie:
+    image: ghcr.io/mealie-recipes/mealie:v2.8.0 # 
+    hostname: mealie
+    user: 1000:1000
+    environment:
+      - *timezone-env-var
+      - ALLOW_SIGNUP=false
+      - BASE_URL=https://mealie.yourdomain.com
+      - DB_ENGINE=postgres
+      - POSTGRES_USER=mealie
+      - POSTGRES_PASSWORD=pass@123
+      - POSTGRES_SERVER=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=mealie
+    volumes:
+      - ./config/mealie/appdata:/app/data/
+    networks:
+      - bridge_net_1
+    ports:
+      - 7101:9000
+    restart: unless-stopped
+    # deploy:
+    #   resources:
+    #     limits:
+    #       memory: 1000M
+    depends_on:
+      - postgres
   # jellyfin:
   #   image: jellyfin/jellyfin
   #   hostname: jellyfin
