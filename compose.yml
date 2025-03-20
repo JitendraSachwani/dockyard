@@ -1,18 +1,19 @@
 version: "3.8"
 
-x-common-config:
-  &common-config
-  networks:
-    - bridge_net_1
-  # restart: unless-stopped
-
-x-common-user-config:
-  &common-config
+x-common-user-config: &common-config
   user: 1000:1000
   networks:
     - bridge_net_1
   restart: unless-stopped
 
+x-timezone-env-var: &timezone-env-var
+  TZ=Etc/UTC
+
+x-common-media-volume: &common-media-volume
+  /media/mediaserver:/media
+
+x-common-download-volume: &common-download-volume
+  /media/mediaserver/MediaShare/Downloads:/downloads
 
 services:
   # duplicati:
@@ -20,7 +21,7 @@ services:
   #   hostname: duplicati
   #   user: 1000:1000
   #   environment:
-  #     - TZ=Etc/UTC
+  #     - *timezone-env-var
   #     - SETTINGS_ENCRYPTION_KEY=282856f2d220e36db5d0ba02dec3f8288ae4b76630de47edb597ed651d3e30fc
   #   volumes:
   #     # - ./config:/source
@@ -37,7 +38,7 @@ services:
     hostname: transmission
     user: 1000:1000
     environment:
-      - TZ=Etc/UTC
+      - *timezone-env-var
       # - TRANSMISSION_WEB_HOME= #optional
       - USER=mediaserver
       - PASS=pass@123
@@ -46,8 +47,7 @@ services:
       # - HOST_WHITELIST= #optional
     volumes:
       - ./config/transmission:/config
-      # - /path/to/downloads:/downloads #optional
-      # - /path/to/watch/folder:/watch #optional
+      - *common-download-volume
     networks:
       - bridge_net_1
     ports:
@@ -55,16 +55,49 @@ services:
       - 51413:51413
       - 51413:51413/udp
     restart: unless-stopped
+  nzbget:
+    image: lscr.io/linuxserver/nzbget:latest
+    hostname: nzbget
+    user: 1000:1000
+    environment:
+      - *timezone-env-var
+      - NZBGET_USER=mediaserver
+      - NZBGET_PASS=pass@123
+    volumes:
+      - ./config/nzbget:/config
+      - *common-download-volume
+    networks:
+      - bridge_net_1
+    ports:
+      - 7003:6789
+    restart: unless-stopped
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    hostname: qbittorrent
+    user: 1000:1000
+    environment:
+      - *timezone-env-var
+      - WEBUI_PORT=8080
+    volumes:
+      - ./config/qbittorrent:/config
+      - *common-download-volume
+    networks:
+      - bridge_net_1
+    ports:
+      - 7004:8080
+      - 6881:6881/tcp
+      - 6881:6881/udp
+    restart: unless-stopped
   # jellyfin:
   #   image: jellyfin/jellyfin
   #   hostname: jellyfin
   #   user: 1000:1000
   #   environment:
+  #     - *timezone-env-var
   #     - JELLYFIN_CACHE_DIR=/var/cache/jellyfin
   #     - JELLYFIN_CONFIG_DIR=/etc/jellyfin
   #     - JELLYFIN_DATA_DIR=/var/lib/jellyfin
   #     - JELLYFIN_LOG_DIR=/var/log/jellyfin
-  #     - TZ=Etc/UTC
   #   volumes:
   #     - ./config/jellyfin/etc:/etc/jellyfin
   #     - ./config/jellyfin/var-cache:/var/cache/jellyfin
@@ -84,7 +117,7 @@ services:
     hostname: prowlarr
     user: 1000:1000
     environment:
-      - TZ=Etc/UTC
+      - *timezone-env-var
     volumes:
       - ./config/prowlarr:/config
     networks:
@@ -92,16 +125,16 @@ services:
     ports:
       - 8002:9696
     restart: unless-stopped
-    # depends_on:
-    #   - flaresolverr
   radarr:
     image: lscr.io/linuxserver/radarr:latest
     hostname: radarr
     user: 1000:1000
     environment:
-      - TZ=Etc/UTC
+      - *timezone-env-var
     volumes:
       - ./config/radarr:/config
+      - *common-download-volume
+      - *common-media-volume
     networks:
       - bridge_net_1
     ports:
@@ -116,9 +149,11 @@ services:
     hostname: sonarr
     user: 1000:1000
     environment:
-      - TZ=Etc/UTC
+      - *timezone-env-var
     volumes:
       - ./config/sonarr:/config
+      - *common-download-volume
+      - *common-media-volume
     networks:
       - bridge_net_1
     ports:
@@ -133,9 +168,11 @@ services:
     hostname: lidarr
     user: 1000:1000
     environment:
-      - TZ=Etc/UTC
+      - *timezone-env-var
     volumes:
-      - ./config/lidarr/:/config/
+      - ./config/lidarr:/config
+      - *common-download-volume
+      - *common-media-volume
     networks:
       - bridge_net_1
     ports:
@@ -150,9 +187,11 @@ services:
     hostname: readarr
     user: 1000:1000
     environment:
-      - TZ=Etc/UTC
+      - *timezone-env-var
     volumes:
       - ./config/readarr:/config
+      - *common-download-volume
+      - *common-media-volume
     networks:
       - bridge_net_1
     ports:
@@ -167,9 +206,11 @@ services:
     hostname: bazarr
     user: 1000:1000
     environment:
-      - TZ=Etc/UTC
+      - *timezone-env-var
     volumes:
       - ./config/bazarr:/config
+      - *common-download-volume
+      - *common-media-volume
     networks:
       - bridge_net_1
     ports:
@@ -183,7 +224,7 @@ services:
     hostname: jellyseerr
     user: 1000:1000
     environment:
-      - TZ=Etc/UTC
+      - *timezone-env-var
     volumes:
       - ./config/jellyseerr:/app/config
     networks:
@@ -199,7 +240,7 @@ services:
   #   hostname: lunasea
   #   user: 1000:1000
   #   environment:
-  #     - TZ=Etc/UTC
+  #     - *timezone-env-var
   #   volumes:
   #     - ./config/lunasea:/config
   #   networks:
