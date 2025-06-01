@@ -6,14 +6,11 @@ x-common-user-config: &common-config
     - bridge_net_1
   restart: unless-stopped
 
-x-timezone-env-var: &timezone-env-var
-  TZ=Etc/UTC
+x-timezone-env-var: &timezone-env-var TZ=Etc/UTC
 
-x-common-media-volume: &common-media-volume
-  /media/mediaserver:/media
+x-common-media-volume: &common-media-volume /media/mediaserver:/media
 
-x-common-download-volume: &common-download-volume
-  /media/mediaserver/MediaShare/Downloads:/downloads
+x-common-download-volume: &common-download-volume /media/mediaserver/MediaShare/Downloads:/downloads
 
 x-common-logging: &common-logging
   logging:
@@ -33,6 +30,8 @@ services:
       - TUNNEL_TOKEN=${TUNNEL_TOKEN}
     volumes:
       - ./config/cloudflared:/etc/cloudflared
+    networks:
+      - bridge_net_1
     restart: unless-stopped
   # duplicati:
   #   image: lscr.io/linuxserver/duplicati:latest
@@ -41,7 +40,7 @@ services:
   #   user: 1000:1000
   #   environment:
   #     - *timezone-env-var
-  #     - SETTINGS_ENCRYPTION_KEY=282856f2d220e36db5d0ba02dec3f8288ae4b76630de47edb597ed651d3e30fc
+  #     - SETTINGS_ENCRYPTION_KEY=${DUPLICATI_ENC_KEY}
   #   volumes:
   #     # - ./config:/source
   #     - ./compose.yml:/source/docker-compose.yml
@@ -337,7 +336,7 @@ services:
     <<: *common-logging
     hostname: homarr
     environment:
-      - SECRET_ENCRYPTION_KEY=282856f2d220e36db5d0ba02dec3f8288ae4b76630de47edb597ed651d3e30fc # TODO: regenerate with `openssl rand -hex 32`
+      - SECRET_ENCRYPTION_KEY=${HOMARR_ENC_KEY}
     volumes:
       - ./custom_entrypoint.sh/:/data/
       - /var/run/docker.sock:/var/run/docker.sock
@@ -346,8 +345,6 @@ services:
       - bridge_net_1
     ports:
       - "8080:7575"
-    # secrets:
-    #   - homarr_enc_key
     # entrypoint: source /data/custom_entrypoint.sh
     restart: unless-stopped
 
@@ -355,6 +352,3 @@ networks:
   bridge_net_1:
     driver: bridge
     attachable: true
-# secrets:
-#   homarr_enc_key:
-#      external: true
