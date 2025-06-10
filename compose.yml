@@ -48,6 +48,7 @@ services:
     image: lscr.io/linuxserver/transmission:latest
     hostname: transmission
     <<: *common-config
+    profiles: ["dev"]
     user: 1000:1000
     environment:
       - *timezone-env-var
@@ -70,6 +71,7 @@ services:
     image: lscr.io/linuxserver/nzbget:latest
     hostname: nzbget
     <<: *common-config
+    profiles: ["dev"]
     user: 1000:1000
     environment:
       - *timezone-env-var
@@ -86,6 +88,7 @@ services:
     image: lscr.io/linuxserver/qbittorrent:latest
     hostname: qbittorrent
     <<: *common-config
+    profiles: ["dev"]
     user: 1000:1000
     environment:
       - *timezone-env-var
@@ -103,6 +106,7 @@ services:
     image: postgres:15
     hostname: postgres
     <<: *common-config
+    profiles: ["dev"]
     environment:
       PGUSER: mealie
       POSTGRES_USER: mealie
@@ -122,6 +126,7 @@ services:
     image: ghcr.io/mealie-recipes/mealie:v2.8.0
     hostname: mealie
     <<: *common-config
+    profiles: ["dev"]
     user: 1000:1000
     environment:
       - *timezone-env-var
@@ -173,6 +178,7 @@ services:
     image: linuxserver/prowlarr:latest
     hostname: prowlarr
     <<: *common-config
+    profiles: ["dev"]
     user: 1000:1000
     environment:
       - *timezone-env-var
@@ -186,6 +192,7 @@ services:
     image: lscr.io/linuxserver/radarr:latest
     hostname: radarr
     <<: *common-config
+    profiles: ["dev"]
     user: 1000:1000
     environment:
       - *timezone-env-var
@@ -205,6 +212,7 @@ services:
     image: lscr.io/linuxserver/sonarr:latest
     hostname: sonarr
     <<: *common-config
+    profiles: ["dev"]
     user: 1000:1000
     environment:
       - *timezone-env-var
@@ -224,6 +232,7 @@ services:
     image: lscr.io/linuxserver/lidarr:latest
     hostname: lidarr
     <<: *common-config
+    profiles: ["dev"]
     user: 1000:1000
     environment:
       - *timezone-env-var
@@ -243,6 +252,7 @@ services:
     image: lscr.io/linuxserver/readarr:develop
     hostname: readarr
     <<: *common-config
+    profiles: ["dev"]
     user: 1000:1000
     environment:
       - *timezone-env-var
@@ -262,6 +272,7 @@ services:
     image: lscr.io/linuxserver/bazarr:latest
     hostname: bazarr
     <<: *common-config
+    profiles: ["dev"]
     user: 1000:1000
     environment:
       - *timezone-env-var
@@ -280,6 +291,7 @@ services:
     image: fallenbagel/jellyseerr:latest
     hostname: jellyseerr
     <<: *common-config
+    profiles: ["dev"]
     user: 1000:1000
     environment:
       - *timezone-env-var
@@ -314,6 +326,7 @@ services:
     image: ghcr.io/homarr-labs/homarr:latest
     hostname: homarr
     <<: *common-config
+    profiles: ["dev"]
     environment:
       - SECRET_ENCRYPTION_KEY=${HOMARR_ENC_KEY}
     volumes:
@@ -348,8 +361,6 @@ services:
     image: fosrl/newt:latest
     hostname: newt
     <<: *common-config
-    profiles:
-      - dev
     environment:
       - PANGOLIN_ENDPOINT=${NEWT_ENDPOINT}
       - NEWT_ID=${NEWT_ID}
