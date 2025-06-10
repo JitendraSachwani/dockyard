@@ -62,7 +62,6 @@ services:
       - 8080:8080
   traefik:
     image: traefik:v3.4.0
-    # hostname: traefik
     <<: [*common-config]
     network_mode: service:gerbil
     depends_on:
