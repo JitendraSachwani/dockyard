@@ -1,48 +1,68 @@
-# My Media Server Setup
+# ⚓ Dockyard - Docker Setups Repository 🐳
 
-## Pre-Requisites
+Welcome to my ⚓ **Dockyard** 🐳
 
-1. Setup docker (https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository)
+This is a centralized harbor for managing multiple Docker-based environments across my infrastructure.
 
+This repository **uses branches** to organize different setups, while the `master` branch serves as a placeholder and reference point with documentation only.
+
+---
+
+## 📂 Branch Structure
+
+### 🔹 [`homelab`](https://github.com/JitendraSachwani/mediaserver/tree/homelab)
+
+This branch contains the **HomeLab** setup — a self-hosted media server stack using Docker Compose. It includes:
+
+- Portainer for container management
+- Transmission / qBittorrent for downloads
+- Radarr / Sonarr / Lidarr for automated content management
+- Tautulli for media stats and analytics
+- Watchtower for auto-updates
+- Plex / Jellyfin for media streaming
+
+Perfect for creating your own private media server running on a Raspberry Pi, NUC, or other home hardware.
+
+---
+
+### 🔹 [`proxy`](https://github.com/JitendraSachwani/mediaserver/tree/proxy)
+
+This branch includes the configuration for a **remote VPS** that acts as a **Pangolin Reverse Proxy** to securely expose services from the HomeLab to the public internet.
+
+- Pangolin for reverse proxying and TLS termination
+- Fail2ban & UFW for basic security
+- Dockerized setup for easy deployment on a low-cost VPS
+
+This setup ensures secure and flexible remote access to HomeLab services.
+
+---
+
+## 🛠️ Getting Started
+
+To use any of these setups clone the specific dockyard branch:
+
+```bash
+git clone --single-branch --branch <dockyard_branch_name> https://github.com/JitendraSachwani/dockyard.git <local_folder_name>
 ```
-for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
 
+Replace <dockyard_branch_name> with one of above mentioned branches and optionally specify a <local_folder_name> if you want to rename the directory locally.
 
-# Add Docker's official GPG key:
-sudo apt-get update
-sudo apt-get install ca-certificates curl
-sudo install -m 0755 -d /etc/apt/keyrings
-sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-sudo chmod a+r /etc/apt/keyrings/docker.asc
+---
 
-# Add the repository to Apt sources:
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
-  $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | \
-  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-sudo apt-get update
+## 🧭 Why Branch-Based?
 
-sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+Using branches allows:
 
-```
+- Modular and independent setups
 
-Test docker installation with 
-```
-sudo docker run hello-world
-```
+- Clean separation of environments
 
-Note: Add other users to the docker group for granting permissions to access docker socket
-```
-sudo usermod -a -G docker jenkins
-```
+- Easier testing, collaboration, and version control
 
-## Start the Media Server
+---
 
-```
-docker swarm init
+## 📬 Feedback & Contributions
 
-# openssl rand -hex 32
-echo "HOMARR_ENC_KEY" | sudo  docker secret create homarr_enc_key -
+This is a personal project, but feel free to fork it, open issues, or suggest improvements. If you're running something similar, I’d love to hear how you’ve set yours up too!
 
-docker deploy --compose-file compose.yml mediaserver
-```
+---
