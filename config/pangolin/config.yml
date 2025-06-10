@@ -14,7 +14,6 @@ server:
     id: 'P-Access-Token-Id'
     token: 'P-Access-Token'
   resource_session_request_param: 'p_session_request'
-  secret: 'd28@a2b.2HFTe2bMtZHGneNYgQFKT2X4vm4HuXUXBcq6aVyNZjdGt6Dx-_A@9b3a'
 
 domains:
   domain1:
