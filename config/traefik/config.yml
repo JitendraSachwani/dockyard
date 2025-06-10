@@ -2,22 +2,22 @@ api:
   insecure: true
   dashboard: true
 
+log:
+  level: "DEBUG" # logging levels are DEBUG, PANIC, FATAL, ERROR, WARN, and INFO.
+  format: "common"
+
 providers:
   http:
     endpoint: "http://pangolin:3001/api/v1/traefik-config"
     pollInterval: "5s"
   file:
-    filename: "/etc/traefik/dynamic_config.yml"
+    filename: "/etc/traefik/route_config.yml"
 
 experimental:
   plugins:
     badger:
       moduleName: "github.com/fosrl/badger"
       version: "v1.2.0"
-
-log:
-  level: "DEBUG" # logging levels are DEBUG, PANIC, FATAL, ERROR, WARN, and INFO.
-  format: "common"
 
 certificatesResolvers:
   letsencrypt:
@@ -27,17 +27,6 @@ certificatesResolvers:
       caServer: "https://acme-v02.api.letsencrypt.org/directory"
       httpChallenge:
         entryPoint: web
-  # cloudflare:
-  #   acme:
-  #     email: sachwani.jitendra@gmail.com
-  #     storage: "/letsencrypt/acme.json"
-  #     caServer: "https://acme-v02.api.letsencrypt.org/directory"
-  #     dnsChallenge:
-  #       provider: cloudflare
-  #       delayBeforeCheck: 0
-  #       resolvers:
-  #         - "1.1.1.1:53"
-  #         - "8.8.8.8:53"
 
 entryPoints:
   web:
@@ -50,7 +39,6 @@ entryPoints:
     http:
       tls:
         certResolver: "letsencrypt"
-        # certResolver: "cloudflare"
 
 serversTransport:
   insecureSkipVerify: true
