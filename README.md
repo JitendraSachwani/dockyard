@@ -1,48 +1,92 @@
-# My Media Server Setup
+# 🌐 Proxy
 
-## Pre-Requisites
+Welcome to the **`proxy`** branch of the ⚓ Dockyard — a secure, containerized reverse proxy environment to expose your self-hosted services to the internet via a remote VPS.
 
-1. Setup docker (https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository)
+This branch configures a hardened **reverse proxy gateway** using [Pangolin](https://github.com/fosrl/pangolin), designed to sit between your public-facing VPS and private HomeLab setup.
 
-```
-for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
+## 
 
+## 📦 What's Inside?
 
-# Add Docker's official GPG key:
-sudo apt-get update
-sudo apt-get install ca-certificates curl
-sudo install -m 0755 -d /etc/apt/keyrings
-sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-sudo chmod a+r /etc/apt/keyrings/docker.asc
+This Docker Compose stack includes:
 
-# Add the repository to Apt sources:
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
-  $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | \
-  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-sudo apt-get update
+| Service     | Purpose                                 |
+|-------------|-----------------------------------------|
+| **Pangolin**| Authentication + control tunnel backend |
+| **Gerbil**  | VPN-like tunnel endpoint with NAT       |
+| **Traefik** | TLS termination + reverse proxy         |
 
-sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+> ✅ Ideal for exposing your internal homelab services to the internet through your VPS' public IP or domain name — without exposing your HomeLab directly.
 
-```
+##
 
-Test docker installation with 
-```
-sudo docker run hello-world
-```
+## 🧱 Setup Overview
 
-Note: Add other users to the docker group for granting permissions to access docker socket
-```
-sudo usermod -a -G docker jenkins
+```plaintext
+🌍   The Public Internet
+              │
+              ▼
+🔐 [Traefik + Gerbil + Pangolin] (VPS)
+              │
+              ▼
+🌐 Internal HomeLab Services (via secure newt tunnel)
 ```
 
-## Start the Media Server
+##
 
+## ⚙️ Getting Started
+
+Clone only this branch:
+
+```bash
+git clone --single-branch --branch proxy https://github.com/JitendraSachwani/dockyard.git proxy
+cd proxy
 ```
-docker swarm init
 
-# openssl rand -hex 32
-echo "HOMARR_ENC_KEY" | sudo  docker secret create homarr_enc_key -
+##
 
-docker deploy --compose-file compose.yml mediaserver
+## 📌 Prerequisites
+
+- Docker + Docker Compose
+
+- `.env` file with secrets
+
+##
+
+## 🧪 Example .env
+
+```bash
+COMPOSE_PROFILES=prod
+TZ=Etc/UTC
+
+SERVER_SECRET=your-secure-server-secret # Can be generated using `openssl rand -base64 48`
+USERS_SERVERADMIN_EMAIL=admin@example.com
+USERS_SERVERADMIN_PASSWORD=super-secure-password
 ```
+
+##
+
+## 🚀 Run the Stack
+
+Run all the services using:
+
+```bash
+docker compose up -d
+```
+
+Stop services:
+
+```bash
+docker compose down
+```
+
+> Any service can be tagged as a development service by adding `profiles: ["dev"]` to their attributes and then running them with `docker compose --profile dev up`
+
+##
+
+## 🤝 Contribute & Customize
+
+This is a personal project, but you're welcome to fork it and adapt it to your needs. If you have ideas or improvements, feel free to open a pull request.
+
+> **Happy Self-Hosting!** 🐳  
+> _– Jitendra Sachwani_
