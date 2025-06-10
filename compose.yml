@@ -1,22 +1,17 @@
-version: "3.8"
-
 x-timezone-env-var: &timezone-env-var TZ=Etc/UTC
 
 x-common-logging: &common-logging
   logging:
-    driver: "json-file"
+    driver: 'json-file'
     options:
       max-size: 10m
-      max-file: "3"
+      max-file: '3'
 
 x-common-config: &common-config
-  user: 1000:1000
   profiles:
     - prod
   environment:
     - *timezone-env-var
-  networks:
-    - bridge_net_1
   restart: unless-stopped
   <<: *common-logging
 
@@ -25,12 +20,17 @@ services:
     image: fosrl/pangolin:1.5.0
     hostname: pangolin
     <<: [*common-config]
+    networks:
+      - bridge_net_1
+    environment:
+      - USERS_SERVERADMIN_EMAIL=${USERS_SERVERADMIN_EMAIL}
+      - USERS_SERVERADMIN_PASSWORD=${USERS_SERVERADMIN_PASSWORD}
     volumes:
       - ./config/pangolin:/app/config
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/api/v1/"]
-      interval: "3s"
-      timeout: "3s"
+      test: ['CMD', 'curl', '-f', 'http://localhost:3001/api/v1/']
+      interval: '3s'
+      timeout: '3s'
       retries: 15
     ports:
       - 3000:3000
@@ -43,6 +43,8 @@ services:
     depends_on:
       pangolin:
         condition: service_healthy
+    networks:
+      - bridge_net_1
     command:
       - --reachableAt=http://gerbil:3003
       - --generateAndSaveKeyTo=/var/config/key
@@ -55,10 +57,14 @@ services:
       - SYS_MODULE
     ports:
       - 51820:51820/udp
+      - 80:80
+      - 443:443
+      - 8080:8080
   traefik:
     image: traefik:v3.4.0
-    hostname: traefik
+    # hostname: traefik
     <<: [*common-config]
+    network_mode: service:gerbil
     depends_on:
       pangolin:
         condition: service_healthy
@@ -67,8 +73,6 @@ services:
     volumes:
       - ./config/traefik:/etc/traefik:ro
       - ./config/traefik/letsencrypt:/letsencrypt
-    ports:
-      - 8080:8080
 
 networks:
   bridge_net_1:

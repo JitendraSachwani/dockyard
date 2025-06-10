@@ -1,38 +1,35 @@
 app:
-  dashboard_url: "http://pangolin.localserver.stream"
-  log_level: "debug"
+  dashboard_url: 'https://pangolin.localserver.stream'
+  log_level: 'debug'
   save_logs: true
 
 server:
   external_port: 3000
   internal_port: 3001
   next_port: 3002
-  internal_hostname: "pangolin"
-  session_cookie_name: "p_session_token"
-  resource_access_token_param: "p_token"
+  internal_hostname: 'pangolin'
+  session_cookie_name: 'p_session_token'
+  resource_access_token_param: 'p_token'
   resource_access_token_headers:
-    id: "P-Access-Token-Id"
-    token: "P-Access-Token"
-  resource_session_request_param: "p_session_request"
-  secret: "d28@a2b.2HFTe2bMtZHGneNYgQFKT2X4vm4HuXUXBcq6aVyNZjdGt6Dx-_A@9b3y"
+    id: 'P-Access-Token-Id'
+    token: 'P-Access-Token'
+  resource_session_request_param: 'p_session_request'
+  secret: 'd28@a2b.2HFTe2bMtZHGneNYgQFKT2X4vm4HuXUXBcq6aVyNZjdGt6Dx-_A@9b3a'
 
 domains:
   domain1:
-    base_domain: "localserver.stream"
-    cert_resolver: "letsencrypt"
+    base_domain: 'localserver.stream'
+    cert_resolver: 'letsencrypt'
     prefer_wildcard_cert: false
-    # cert_resolver: "cloudflare"
-    # prefer_wildcard_cert: true
 
 traefik:
-  http_entrypoint: "web"
-  https_entrypoint: "websecure"
-  cert_resolver: "letsencrypt"
-  # cert_resolver: "cloudflare"
+  http_entrypoint: 'web'
+  https_entrypoint: 'websecure'
+  cert_resolver: 'letsencrypt'
 
 gerbil:
   start_port: 51820
-  base_endpoint: "pangolin.localserver.stream"
+  base_endpoint: 'pangolin.localserver.stream'
   use_subdomain: false
   subnet_group: 100.89.137.0/20
   block_size: 24
@@ -52,8 +49,7 @@ rate_limits:
 
 users:
   server_admin:
-    email: "admin@localserver.stream"
-    password: "Pass@123"
+    email: 'admin@localserver.stream'
 
 flags:
   require_email_verification: true
