@@ -23,6 +23,7 @@ services:
     networks:
       - bridge_net_1
     environment:
+      - SERVER_SECRET=${SERVER_SECRET}
       - USERS_SERVERADMIN_EMAIL=${USERS_SERVERADMIN_EMAIL}
       - USERS_SERVERADMIN_PASSWORD=${USERS_SERVERADMIN_PASSWORD}
     volumes:
