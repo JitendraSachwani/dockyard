@@ -14,9 +14,9 @@ x-common-logging: &common-logging
       max-file: "3"
 
 x-common-config: &common-config
+  networks:
+    - bridge_net_1
   # user: 1000:1000
-  # networks:
-  #   - bridge_net_1
   profiles:
     - prod
   restart: unless-stopped
@@ -27,82 +27,6 @@ x-common-network: &common-network
     - bridge_net_1
 
 services:
-  pangolin:
-    image: fosrl/pangolin:1.5.0
-    hostname: pangolin
-    <<: [*common-config, *common-network]
-    profiles: ["dev"]
-    environment:
-      - *timezone-env-var
-    volumes:
-      - ./config/pangolin:/app/config
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/api/v1/"]
-      interval: "3s"
-      timeout: "3s"
-      retries: 15
-    ports:
-      - 3000:3000
-      - 3001:3001
-      - 3002:3002
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    hostname: cloudflared
-    <<: [*common-config, *common-network]
-    profiles: ["dev"]
-    depends_on:
-      pangolin:
-        condition: service_healthy
-    user: 1000:1000
-    command: tunnel --no-autoupdate run
-    environment:
-      - *timezone-env-var
-      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
-    volumes:
-      - ./config/cloudflared:/etc/cloudflared
-  gerbil:
-    image: fosrl/gerbil:1.0.0
-    hostname: gerbil
-    <<: [*common-config, *common-network]
-    profiles: ["dev"]
-    depends_on:
-      pangolin:
-        condition: service_healthy
-    command:
-      - --reachableAt=http://gerbil:3003
-      - --generateAndSaveKeyTo=/var/config/key
-      - --remoteConfig=http://pangolin:3001/api/v1/gerbil/get-config
-      - --reportBandwidthTo=http://pangolin:3001/api/v1/gerbil/receive-bandwidth
-    environment:
-      - *timezone-env-var
-    volumes:
-      - ./config/pangolin:/var/config
-    cap_add:
-      - NET_ADMIN
-      - SYS_MODULE
-    ports:
-      - 51820:51820/udp
-  traefik:
-    image: traefik:v3.4.0
-    hostname: traefik
-    # network_mode: service:gerbil # Ports appear on the gerbil service
-    <<: [*common-config, *common-network]
-    profiles: ["dev"]
-    depends_on:
-      pangolin:
-        condition: service_healthy
-    environment:
-      - *timezone-env-var
-      - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
-      # - LEGO_DISABLE_CNAME_SUPPORT=true
-    command:
-      - --configFile=/etc/traefik/traefik_config.yml
-    volumes:
-      - ./config/pangolin/traefik:/etc/traefik:ro
-      - ./config/pangolin/letsencrypt:/letsencrypt
-    ports:
-      - 8080:8080
-
   # duplicati:
   #   image: lscr.io/linuxserver/duplicati:latest
   #   hostname: duplicati
@@ -400,7 +324,6 @@ services:
       - bridge_net_1
     ports:
       - "8080:7575"
-    # entrypoint: source /data/custom_entrypoint.sh
   # the-market-diary:
   #   image: ghcr.io/jitendrasachwani/jitendrasachwani/the-market-diary:latest
   #   hostname: the-market-diary
@@ -419,6 +342,37 @@ services:
   #   ports:
   #     - "3000:3000"
   #     - "3001:3001"
+
+  # ALWAYS KEEP THIS AS THE LAST SERVICE IN THE FILE AND ADD ALL DEPENDENCIES IN THE DEPENDS_ON SECTION
+  newt:
+    image: fosrl/newt:latest
+    hostname: newt
+    <<: *common-config
+    environment:
+      - PANGOLIN_ENDPOINT=${NEWT_ENDPOINT}
+      - NEWT_ID=${NEWT_ID}
+      - NEWT_SECRET=${NEWT_SECRET}
+      - LOG_LEVEL=DEBUG
+    # TODO: Test all one by one and uncomment
+    # depends_on:
+    #   - homarr
+    #   - radarr
+    #   - sonarr
+    #   - lidarr
+    #   - readarr
+    #   - bazarr
+    #   - jellyseerr
+    #   - jellyfin
+    #   - prowlarr
+    #   - transmission
+    #   - nzbget
+    #   - qbittorrent
+    #   - mealie
+    #   - duplicati
+    #   - postgres
+    #   - the-market-diary
+    #   - lunasea
+  # DO NOT ADD ANY SERVICES BELOW THE NEWT SERVICE, ADD THEM ABOVE THIS SERVICE IF NEEDED
 
 networks:
   bridge_net_1:
