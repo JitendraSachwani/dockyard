@@ -348,6 +348,8 @@ services:
     image: fosrl/newt:latest
     hostname: newt
     <<: *common-config
+    profiles:
+      - dev
     environment:
       - PANGOLIN_ENDPOINT=${NEWT_ENDPOINT}
       - NEWT_ID=${NEWT_ID}
