@@ -8,7 +8,7 @@ This setup is designed for tech-savvy enthusiasts running on **Raspberry Pi**, *
 
 ## 📦 What's Inside?
 
-This stack includes a full suite of tools for
+This Docker Compose stack includes a full suite of tools for
 
 ### 📥 Download Automation
 
