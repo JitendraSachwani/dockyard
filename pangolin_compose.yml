@@ -1,0 +1,74 @@
+version: "3.8"
+
+x-timezone-env-var: &timezone-env-var TZ=Etc/UTC
+
+x-common-logging: &common-logging
+  logging:
+    driver: "json-file"
+    options:
+      max-size: 10m
+      max-file: "3"
+
+x-common-config: &common-config
+  user: 1000:1000
+  profiles:
+    - prod
+  environment:
+    - *timezone-env-var
+  networks:
+    - bridge_net_1
+  restart: unless-stopped
+  <<: *common-logging
+
+services:
+  pangolin:
+    image: fosrl/pangolin:1.5.0
+    hostname: pangolin
+    <<: [*common-config]
+    volumes:
+      - ./config/pangolin:/app/config
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/v1/"]
+      interval: "3s"
+      timeout: "3s"
+      retries: 15
+    ports:
+      - 3000:3000
+      - 3001:3001
+      - 3002:3002
+  gerbil:
+    image: fosrl/gerbil:1.0.0
+    hostname: gerbil
+    <<: [*common-config]
+    depends_on:
+      pangolin:
+        condition: service_healthy
+    command:
+      - --reachableAt=http://gerbil:3003
+      - --generateAndSaveKeyTo=/var/config/key
+      - --remoteConfig=http://pangolin:3001/api/v1/gerbil/get-config
+      - --reportBandwidthTo=http://pangolin:3001/api/v1/gerbil/receive-bandwidth
+    volumes:
+      - ./config/pangolin:/var/config
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    ports:
+      - 51820:51820/udp
+  traefik:
+    image: traefik:v3.4.0
+    hostname: traefik
+    <<: [*common-config]
+    depends_on:
+      pangolin:
+        condition: service_healthy
+    # environment:
+    # - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
+    # - LEGO_DISABLE_CNAME_SUPPORT=true
+    command:
+      - --configFile=/etc/traefik/traefik_config.yml
+    volumes:
+      - ./config/pangolin/traefik:/etc/traefik:ro
+      - ./config/pangolin/letsencrypt:/letsencrypt
+    ports:
+      - 8080:8080

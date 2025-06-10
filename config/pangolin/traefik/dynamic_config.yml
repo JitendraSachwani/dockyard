@@ -1,0 +1,56 @@
+http:
+  middlewares:
+    redirect-to-https:
+      redirectScheme:
+        scheme: https
+
+  routers:
+    # HTTP to HTTPS redirect router
+    # main-app-router-redirect:
+    #   rule: "Host(`pangolin.localserver.stream`)"
+    #   service: next-service
+    #   entryPoints:
+    #     - web
+    #   middlewares:
+    #     - redirect-to-https
+
+    # Next.js router (handles everything except API and WebSocket paths)
+    next-router:
+      rule: "Host(`pangolin.localserver.stream`) && !PathPrefix(`/api/v1`)"
+      service: next-service
+      entryPoints:
+        - web
+      #   - websecure
+      # tls:
+      #   certResolver: letsencrypt
+
+    # API router (handles /api/v1 paths)
+    api-router:
+      rule: "Host(`pangolin.localserver.stream`) && PathPrefix(`/api/v1`)"
+      service: api-service
+      entryPoints:
+        - web
+      #   - websecure
+      # tls:
+      #   certResolver: letsencrypt
+
+    # WebSocket router
+    ws-router:
+      rule: "Host(`pangolin.localserver.stream`)"
+      service: api-service
+      entryPoints:
+        - web
+      #   - websecure
+      # tls:
+      #   certResolver: letsencrypt
+
+  services:
+    next-service:
+      loadBalancer:
+        servers:
+          - url: "http://pangolin:3002"
+
+    api-service:
+      loadBalancer:
+        servers:
+          - url: "http://pangolin:3001"

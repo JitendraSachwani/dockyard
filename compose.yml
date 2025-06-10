@@ -1,11 +1,5 @@
 version: "3.8"
 
-x-common-user-config: &common-config
-  user: 1000:1000
-  networks:
-    - bridge_net_1
-  restart: unless-stopped
-
 x-timezone-env-var: &timezone-env-var TZ=Etc/UTC
 
 x-common-media-volume: &common-media-volume /media/mediaserver:/media
@@ -19,10 +13,46 @@ x-common-logging: &common-logging
       max-size: 10m
       max-file: "3"
 
+x-common-config: &common-config
+  # user: 1000:1000
+  # networks:
+  #   - bridge_net_1
+  profiles:
+    - prod
+  restart: unless-stopped
+  <<: *common-logging
+
+x-common-network: &common-network
+  networks:
+    - bridge_net_1
+
 services:
+  pangolin:
+    image: fosrl/pangolin:1.5.0
+    hostname: pangolin
+    <<: [*common-config, *common-network]
+    profiles: ["dev"]
+    environment:
+      - *timezone-env-var
+    volumes:
+      - ./config/pangolin:/app/config
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/v1/"]
+      interval: "3s"
+      timeout: "3s"
+      retries: 15
+    ports:
+      - 3000:3000
+      - 3001:3001
+      - 3002:3002
   cloudflared:
     image: cloudflare/cloudflared:latest
-    <<: *common-logging
+    hostname: cloudflared
+    <<: [*common-config, *common-network]
+    profiles: ["dev"]
+    depends_on:
+      pangolin:
+        condition: service_healthy
     user: 1000:1000
     command: tunnel --no-autoupdate run
     environment:
@@ -30,13 +60,53 @@ services:
       - TUNNEL_TOKEN=${TUNNEL_TOKEN}
     volumes:
       - ./config/cloudflared:/etc/cloudflared
-    networks:
-      - bridge_net_1
-    restart: unless-stopped
+  gerbil:
+    image: fosrl/gerbil:1.0.0
+    hostname: gerbil
+    <<: [*common-config, *common-network]
+    profiles: ["dev"]
+    depends_on:
+      pangolin:
+        condition: service_healthy
+    command:
+      - --reachableAt=http://gerbil:3003
+      - --generateAndSaveKeyTo=/var/config/key
+      - --remoteConfig=http://pangolin:3001/api/v1/gerbil/get-config
+      - --reportBandwidthTo=http://pangolin:3001/api/v1/gerbil/receive-bandwidth
+    environment:
+      - *timezone-env-var
+    volumes:
+      - ./config/pangolin:/var/config
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    ports:
+      - 51820:51820/udp
+  traefik:
+    image: traefik:v3.4.0
+    hostname: traefik
+    # network_mode: service:gerbil # Ports appear on the gerbil service
+    <<: [*common-config, *common-network]
+    profiles: ["dev"]
+    depends_on:
+      pangolin:
+        condition: service_healthy
+    environment:
+      - *timezone-env-var
+      - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
+      # - LEGO_DISABLE_CNAME_SUPPORT=true
+    command:
+      - --configFile=/etc/traefik/traefik_config.yml
+    volumes:
+      - ./config/pangolin/traefik:/etc/traefik:ro
+      - ./config/pangolin/letsencrypt:/letsencrypt
+    ports:
+      - 8080:8080
+
   # duplicati:
   #   image: lscr.io/linuxserver/duplicati:latest
-  #   <<: *common-logging
   #   hostname: duplicati
+  #   <<: *common-config
   #   user: 1000:1000
   #   environment:
   #     - *timezone-env-var
@@ -50,11 +120,10 @@ services:
   #     - bridge_net_1
   #   ports:
   #     - 7001:8200
-  #   restart: unless-stopped
   transmission:
     image: lscr.io/linuxserver/transmission:latest
-    <<: *common-logging
     hostname: transmission
+    <<: *common-config
     user: 1000:1000
     environment:
       - *timezone-env-var
@@ -73,11 +142,10 @@ services:
       - 7002:9091
       - 51413:51413
       - 51413:51413/udp
-    restart: unless-stopped
   nzbget:
     image: lscr.io/linuxserver/nzbget:latest
-    <<: *common-logging
     hostname: nzbget
+    <<: *common-config
     user: 1000:1000
     environment:
       - *timezone-env-var
@@ -90,11 +158,10 @@ services:
       - bridge_net_1
     ports:
       - 7003:6789
-    restart: unless-stopped
   qbittorrent:
     image: lscr.io/linuxserver/qbittorrent:latest
-    <<: *common-logging
     hostname: qbittorrent
+    <<: *common-config
     user: 1000:1000
     environment:
       - *timezone-env-var
@@ -108,11 +175,10 @@ services:
       - 7004:8080
       - 6881:6881/tcp
       - 6881:6881/udp
-    restart: unless-stopped
   postgres:
     image: postgres:15
-    <<: *common-logging
     hostname: postgres
+    <<: *common-config
     environment:
       PGUSER: mealie
       POSTGRES_USER: mealie
@@ -128,11 +194,10 @@ services:
       interval: 30s
       timeout: 20s
       retries: 3
-    restart: unless-stopped
   mealie:
     image: ghcr.io/mealie-recipes/mealie:v2.8.0
-    <<: *common-logging
     hostname: mealie
+    <<: *common-config
     user: 1000:1000
     environment:
       - *timezone-env-var
@@ -150,7 +215,6 @@ services:
       - bridge_net_1
     ports:
       - 7101:9000
-    restart: unless-stopped
     # deploy:
     #   resources:
     #     limits:
@@ -181,11 +245,10 @@ services:
   #     - 8000:8096
   #   devices:
   #     - /dev/dri/renderD128:/dev/dri/renderD128
-  #   restart: unless-stopped
   prowlarr:
     image: linuxserver/prowlarr:latest
-    <<: *common-logging
     hostname: prowlarr
+    <<: *common-config
     user: 1000:1000
     environment:
       - *timezone-env-var
@@ -195,11 +258,10 @@ services:
       - bridge_net_1
     ports:
       - 8002:9696
-    restart: unless-stopped
   radarr:
     image: lscr.io/linuxserver/radarr:latest
-    <<: *common-logging
     hostname: radarr
+    <<: *common-config
     user: 1000:1000
     environment:
       - *timezone-env-var
@@ -211,15 +273,14 @@ services:
       - bridge_net_1
     ports:
       - 8101:7878
-    restart: unless-stopped
     depends_on:
       # - jellyfin
       - transmission
       - prowlarr
   sonarr:
     image: lscr.io/linuxserver/sonarr:latest
-    <<: *common-logging
     hostname: sonarr
+    <<: *common-config
     user: 1000:1000
     environment:
       - *timezone-env-var
@@ -231,15 +292,14 @@ services:
       - bridge_net_1
     ports:
       - 8102:8989
-    restart: unless-stopped
     depends_on:
       # - jellyfin
       - transmission
       - prowlarr
   lidarr:
     image: lscr.io/linuxserver/lidarr:latest
-    <<: *common-logging
     hostname: lidarr
+    <<: *common-config
     user: 1000:1000
     environment:
       - *timezone-env-var
@@ -251,15 +311,14 @@ services:
       - bridge_net_1
     ports:
       - 8103:8686
-    restart: unless-stopped
     depends_on:
       # - jellyfin
       - transmission
       - prowlarr
   readarr:
     image: lscr.io/linuxserver/readarr:develop
-    <<: *common-logging
     hostname: readarr
+    <<: *common-config
     user: 1000:1000
     environment:
       - *timezone-env-var
@@ -271,15 +330,14 @@ services:
       - bridge_net_1
     ports:
       - 8104:8787
-    restart: unless-stopped
     depends_on:
       # - jellyfin
       - transmission
       - prowlarr
   bazarr:
     image: lscr.io/linuxserver/bazarr:latest
-    <<: *common-logging
     hostname: bazarr
+    <<: *common-config
     user: 1000:1000
     environment:
       - *timezone-env-var
@@ -291,14 +349,13 @@ services:
       - bridge_net_1
     ports:
       - 8201:6767
-    restart: unless-stopped
     depends_on:
       - radarr
       - sonarr
   jellyseerr:
     image: fallenbagel/jellyseerr:latest
-    <<: *common-logging
     hostname: jellyseerr
+    <<: *common-config
     user: 1000:1000
     environment:
       - *timezone-env-var
@@ -308,14 +365,13 @@ services:
       - bridge_net_1
     ports:
       - 8202:5055
-    restart: unless-stopped
     depends_on:
       - radarr
       - sonarr
   # lunasea:
   #   image: ghcr.io/jagandeepbrar/lunasea:stable
-  #   <<: *common-logging
   #   hostname: lunasea
+  #   <<: *common-config
   #   user: 1000:1000
   #   environment:
   #     - *timezone-env-var
@@ -325,7 +381,6 @@ services:
   #     - bridge_net_1
   #   ports:
   #     - 8203:80
-  #   restart: unless-stopped
   #   depends_on:
   #     - radarr
   #     - sonarr
@@ -333,8 +388,8 @@ services:
   #     - readarr
   homarr:
     image: ghcr.io/homarr-labs/homarr:latest
-    <<: *common-logging
     hostname: homarr
+    <<: *common-config
     environment:
       - SECRET_ENCRYPTION_KEY=${HOMARR_ENC_KEY}
     volumes:
@@ -346,7 +401,24 @@ services:
     ports:
       - "8080:7575"
     # entrypoint: source /data/custom_entrypoint.sh
-    restart: unless-stopped
+  # the-market-diary:
+  #   image: ghcr.io/jitendrasachwani/jitendrasachwani/the-market-diary:latest
+  #   hostname: the-market-diary
+  #   <<: *common-config
+  #   user: 1000:1000
+  #   environment:
+  #     - DOCKER_REGISTRY_USERNAME=${DOCKER_REGISTRY_USERNAME}
+  #     - DOCKER_REGISTRY_PASSWORD=${DOCKER_REGISTRY_PASSWORD}
+  #     - *timezone-env-var
+  #     - NODE_ENV=production
+  #   volumes:
+  #     - ../the-market-diary/public/videos:/app/public/videos
+  #     - ../the-market-diary/out/bundle:/app/out/bundle
+  #   networks:
+  #     - bridge_net_1
+  #   ports:
+  #     - "3000:3000"
+  #     - "3001:3001"
 
 networks:
   bridge_net_1:
