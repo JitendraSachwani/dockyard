@@ -6,13 +6,6 @@ x-common-media-volume: &common-media-volume /media/mediaserver:/media
 
 x-common-download-volume: &common-download-volume /media/mediaserver/MediaShare/Downloads:/downloads
 
-x-common-logging: &common-logging
-  logging:
-    driver: "json-file"
-    options:
-      max-size: 10m
-      max-file: "3"
-
 x-common-config: &common-config
   networks:
     - bridge_net_1
@@ -20,53 +13,114 @@ x-common-config: &common-config
   profiles:
     - prod
   restart: unless-stopped
-  <<: *common-logging
-
-x-common-network: &common-network
-  networks:
-    - bridge_net_1
+  logging:
+    driver: "json-file"
+    options:
+      max-size: 10m
+      max-file: "3"
 
 services:
-  # duplicati:
-  #   image: lscr.io/linuxserver/duplicati:latest
-  #   hostname: duplicati
-  #   <<: *common-config
-  #   user: 1000:1000
-  #   environment:
-  #     - *timezone-env-var
-  #     - SETTINGS_ENCRYPTION_KEY=${DUPLICATI_ENC_KEY}
-  #   volumes:
-  #     # - ./config:/source
-  #     - ./compose.yml:/source/docker-compose.yml
-  #     - ./config/duplicati/config:/config
-  #     - ./config/duplicati/restore:/restore
-  #   networks:
-  #     - bridge_net_1
-  #   ports:
-  #     - 7001:8200
-  transmission:
-    image: lscr.io/linuxserver/transmission:latest
-    hostname: transmission
+  redis: # Runs on port 6379
+    image: redis:alpine
+    hostname: authentik-redis
     <<: *common-config
-    profiles: ["dev"]
-    user: 1000:1000
-    environment:
-      - *timezone-env-var
-      # - TRANSMISSION_WEB_HOME= #optional
-      - USER=mediaserver
-      - PASS=pass@123
-      # - WHITELIST= #optional
-      # - PEERPORT= #optional
-      # - HOST_WHITELIST= #optional
     volumes:
-      - ./config/transmission:/config
-      - *common-download-volume
-    networks:
-      - bridge_net_1
-    ports:
-      - 7002:9091
-      - 51413:51413
-      - 51413:51413/udp
+      - ./config/databases/redis/data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      start_period: 20s
+      interval: 10s
+      retries: 5
+      timeout: 3s
+  redis-insight: # Runs on port 5540
+    image: redis/redisinsight:latest
+    hostname: redisinsight
+    <<: *common-config
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_URI=redis://redis:6379
+    volumes:
+      - ./config/redis-insight:/data
+  postgres: # Runs on port 5432
+    image: postgres:15
+    hostname: postgres
+    <<: *common-config
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./config/databases/postgres/data:/var/lib/postgresql/data
+      # - ./config/databases/postgres/initdb:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+  pgadmin: # Runs on port 80
+    image: dpage/pgadmin4
+    hostname: pgadmin
+    <<: *common-config
+    user: "$UID:$GID"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@localserver.stream
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+    volumes:
+      - ./config/pgadmin/data:/var/lib/pgadmin
+  authentik-server: # Runs on port 9000 (Web UI) and 9443 (Https Web UI)
+    image: ghcr.io/goauthentik/server:latest
+    hostname: authentik-server
+    <<: *common-config
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: server
+    environment:
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
+      AUTHENTIK_REDIS__HOST: redis
+      AUTHENTIK_POSTGRESQL__HOST: postgres
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__USER: ${POSTGRES_USER}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./config/authentik/media:/media
+      - ./config/authentik/templates:/templates
+  authentik-worker: # Runs on port 8000 (Worker UI)
+    image: ghcr.io/goauthentik/server:latest
+    hostname: authentik-worker
+    <<: *common-config
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: worker
+    environment:
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
+      AUTHENTIK_REDIS__HOST: redis
+      AUTHENTIK_POSTGRESQL__HOST: postgres
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__USER: ${POSTGRES_USER}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./config/authentik/media:/media
+      - ./config/authentik/templates:/templates
+  vaultwarden: # Runs on port 80
+    image: vaultwarden/server:latest
+    hostname: vaultwarden
+    <<: *common-config
+    volumes:
+      - ./config/vaultwarden/data:/data
+    environment:
+      - ADMIN_TOKEN=${VAULT_ADMIN_TOKEN}
+      - WEBSOCKET_ENABLED=true # Enable WebSocket notifications
+      - SIGNUPS_ALLOWED=false
   nzbget:
     image: lscr.io/linuxserver/nzbget:latest
     hostname: nzbget
@@ -84,11 +138,10 @@ services:
       - bridge_net_1
     ports:
       - 7003:6789
-  qbittorrent:
+  qbittorrent: # Runs on port 8080 (Web UI) and 6881 (Torrent Client)
     image: lscr.io/linuxserver/qbittorrent:latest
     hostname: qbittorrent
     <<: *common-config
-    profiles: ["dev"]
     user: 1000:1000
     environment:
       - *timezone-env-var
@@ -96,103 +149,26 @@ services:
     volumes:
       - ./config/qbittorrent:/config
       - *common-download-volume
-    networks:
-      - bridge_net_1
     ports:
-      - 7004:8080
+      - 8080:8080
       - 6881:6881/tcp
       - 6881:6881/udp
-  postgres:
-    image: postgres:15
-    hostname: postgres
-    <<: *common-config
-    profiles: ["dev"]
-    environment:
-      PGUSER: mealie
-      POSTGRES_USER: mealie
-      POSTGRES_PASSWORD: pass@123
-    volumes:
-      - ./config/mealie/pgdata:/var/lib/postgresql/data
-    networks:
-      - bridge_net_1
-    ports:
-      - 7005:5432
-    healthcheck:
-      test: ["CMD", "pg_isready"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
-  mealie:
-    image: ghcr.io/mealie-recipes/mealie:v2.8.0
-    hostname: mealie
-    <<: *common-config
-    profiles: ["dev"]
-    user: 1000:1000
-    environment:
-      - *timezone-env-var
-      - ALLOW_SIGNUP=false
-      - BASE_URL=https://mealie.yourdomain.com
-      - DB_ENGINE=postgres
-      - POSTGRES_USER=mealie
-      - POSTGRES_PASSWORD=pass@123
-      - POSTGRES_SERVER=postgres
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=mealie
-    volumes:
-      - ./config/mealie/appdata:/app/data/
-    networks:
-      - bridge_net_1
-    ports:
-      - 7101:9000
-    # deploy:
-    #   resources:
-    #     limits:
-    #       memory: 1000M
-    depends_on:
-      - postgres
-  # jellyfin:
-  #   image: jellyfin/jellyfin
-  #   <<: *common-logging
-  #   hostname: jellyfin
-  #   user: 1000:1000
-  #   environment:
-  #     - *timezone-env-var
-  #     - JELLYFIN_CACHE_DIR=/var/cache/jellyfin
-  #     - JELLYFIN_CONFIG_DIR=/etc/jellyfin
-  #     - JELLYFIN_DATA_DIR=/var/lib/jellyfin
-  #     - JELLYFIN_LOG_DIR=/var/log/jellyfin
-  #   volumes:
-  #     - ./config/jellyfin/etc:/etc/jellyfin
-  #     - ./config/jellyfin/var-cache:/var/cache/jellyfin
-  #     - ./config/jellyfin/var-lib:/var/lib/jellyfin
-  #     - ./config/jellyfin/var-log:/var/log/jellyfin
-  #     - ./config/jellyfin/timezone:/etc/timezone
-  #   group_add:
-  #     - "109"
-  #   network_mode: "host"
-  #   ports:
-  #     - 8000:8096
-  #   devices:
-  #     - /dev/dri/renderD128:/dev/dri/renderD128
-  prowlarr:
+  prowlarr: # Runs on port 9696
     image: linuxserver/prowlarr:latest
     hostname: prowlarr
     <<: *common-config
-    profiles: ["dev"]
     user: 1000:1000
     environment:
       - *timezone-env-var
     volumes:
       - ./config/prowlarr:/config
-    networks:
-      - bridge_net_1
-    ports:
-      - 8002:9696
-  radarr:
+    depends_on:
+    #   - nzbget
+      - qbittorrent
+  radarr: # Runs on port 7878
     image: lscr.io/linuxserver/radarr:latest
     hostname: radarr
     <<: *common-config
-    profiles: ["dev"]
     user: 1000:1000
     environment:
       - *timezone-env-var
@@ -200,19 +176,12 @@ services:
       - ./config/radarr:/config
       - *common-download-volume
       - *common-media-volume
-    networks:
-      - bridge_net_1
-    ports:
-      - 8101:7878
     depends_on:
-      # - jellyfin
-      - transmission
       - prowlarr
-  sonarr:
+  sonarr: # Runs on port 8989
     image: lscr.io/linuxserver/sonarr:latest
     hostname: sonarr
     <<: *common-config
-    profiles: ["dev"]
     user: 1000:1000
     environment:
       - *timezone-env-var
@@ -220,55 +189,9 @@ services:
       - ./config/sonarr:/config
       - *common-download-volume
       - *common-media-volume
-    networks:
-      - bridge_net_1
-    ports:
-      - 8102:8989
     depends_on:
-      # - jellyfin
-      - transmission
       - prowlarr
-  lidarr:
-    image: lscr.io/linuxserver/lidarr:latest
-    hostname: lidarr
-    <<: *common-config
-    profiles: ["dev"]
-    user: 1000:1000
-    environment:
-      - *timezone-env-var
-    volumes:
-      - ./config/lidarr:/config
-      - *common-download-volume
-      - *common-media-volume
-    networks:
-      - bridge_net_1
-    ports:
-      - 8103:8686
-    depends_on:
-      # - jellyfin
-      - transmission
-      - prowlarr
-  readarr:
-    image: lscr.io/linuxserver/readarr:develop
-    hostname: readarr
-    <<: *common-config
-    profiles: ["dev"]
-    user: 1000:1000
-    environment:
-      - *timezone-env-var
-    volumes:
-      - ./config/readarr:/config
-      - *common-download-volume
-      - *common-media-volume
-    networks:
-      - bridge_net_1
-    ports:
-      - 8104:8787
-    depends_on:
-      # - jellyfin
-      - transmission
-      - prowlarr
-  bazarr:
+  bazarr: # [DEV] Runs on port 6767
     image: lscr.io/linuxserver/bazarr:latest
     hostname: bazarr
     <<: *common-config
@@ -280,48 +203,85 @@ services:
       - ./config/bazarr:/config
       - *common-download-volume
       - *common-media-volume
-    networks:
-      - bridge_net_1
-    ports:
-      - 8201:6767
     depends_on:
       - radarr
       - sonarr
-  jellyseerr:
+  lidarr: # Runs on port 8686
+    image: lscr.io/linuxserver/lidarr:latest
+    hostname: lidarr
+    <<: *common-config
+    user: 1000:1000
+    environment:
+      - *timezone-env-var
+    volumes:
+      - ./config/lidarr:/config
+      - *common-download-volume
+      - *common-media-volume
+    depends_on:
+      - prowlarr
+  readarr: # Runs on port 8787
+    image: lscr.io/linuxserver/readarr:develop
+    hostname: readarr
+    <<: *common-config
+    user: 1000:1000
+    environment:
+      - *timezone-env-var
+    volumes:
+      - ./config/readarr:/config
+      - *common-download-volume
+      - *common-media-volume
+    depends_on:
+      - prowlarr
+  jellyfin: # Runs on port 8096 (HTTP) & 8920 (HTTPS)
+    image: lscr.io/linuxserver/jellyfin:latest
+    hostname: jellyfin
+    <<: *common-config
+    environment:
+      - *timezone-env-var
+    volumes:
+      - ./config/jellyfin/config:/config
+      - *common-media-volume
+    ports:
+      - 8000:8096
+  jellyseerr: # Runs on port 5055
     image: fallenbagel/jellyseerr:latest
     hostname: jellyseerr
     <<: *common-config
-    profiles: ["dev"]
     user: 1000:1000
     environment:
       - *timezone-env-var
     volumes:
       - ./config/jellyseerr:/app/config
-    networks:
-      - bridge_net_1
-    ports:
-      - 8202:5055
     depends_on:
+      - jellyfin
       - radarr
       - sonarr
-  # lunasea:
-  #   image: ghcr.io/jagandeepbrar/lunasea:stable
-  #   hostname: lunasea
-  #   <<: *common-config
-  #   user: 1000:1000
-  #   environment:
-  #     - *timezone-env-var
-  #   volumes:
-  #     - ./config/lunasea:/config
-  #   networks:
-  #     - bridge_net_1
-  #   ports:
-  #     - 8203:80
-  #   depends_on:
-  #     - radarr
-  #     - sonarr
-  #     - lidarr
-  #     - readarr
+  mealie: # Runs on port 9000 
+    image: ghcr.io/mealie-recipes/mealie:v3.0.2
+    hostname: mealie
+    <<: *common-config
+    user: 1000:1000
+    environment:
+      - *timezone-env-var
+      - ALLOW_SIGNUP=false
+      - BASE_URL=https://mealie.localserver.stream
+      - DB_ENGINE=postgres
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_SERVER=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=mealie
+    volumes:
+      - ./config/mealie/appdata:/app/data/
+    depends_on:
+      postgres:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 500M
+    ports:
+      - 9000:9000
   homarr:
     image: ghcr.io/homarr-labs/homarr:latest
     hostname: homarr
@@ -367,24 +327,21 @@ services:
       - NEWT_SECRET=${NEWT_SECRET}
       - LOG_LEVEL=DEBUG
     # TODO: Test all one by one and uncomment
-    # depends_on:
-    #   - homarr
-    #   - radarr
-    #   - sonarr
-    #   - lidarr
-    #   - readarr
-    #   - bazarr
-    #   - jellyseerr
-    #   - jellyfin
-    #   - prowlarr
-    #   - transmission
-    #   - nzbget
-    #   - qbittorrent
-    #   - mealie
-    #   - duplicati
-    #   - postgres
-    #   - the-market-diary
-    #   - lunasea
+    depends_on:
+        - redis-insight
+        - pgadmin
+        - vaultwarden
+        - nzbget
+        - qbittorrent
+        - prowlarr
+        - radarr
+        - sonarr
+        # - bazarr
+        - lidarr
+        - readarr
+        - jellyseerr
+        - jellyfin
+        # - mealie
   # DO NOT ADD ANY SERVICES BELOW THE NEWT SERVICE, ADD THEM ABOVE THIS SERVICE IF NEEDED
 
 networks:
