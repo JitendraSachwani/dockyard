@@ -10,7 +10,7 @@ This repository **uses branches** to organize different setups, while the `maste
 
 ## 📂 Branch Structure
 
-### 🔹 [`homelab`](https://github.com/JitendraSachwani/mediaserver/tree/homelab)
+### 🔹 [`homelab`](https://github.com/JitendraSachwani/dockyard/tree/homelab)
 
 This branch contains the **HomeLab** setup — a self-hosted media server stack using Docker Compose. It includes:
 
@@ -25,7 +25,7 @@ Perfect for creating your own private media server running on a Raspberry Pi, NU
 
 ## 
 
-### 🔹 [`proxy`](https://github.com/JitendraSachwani/mediaserver/tree/proxy)
+### 🔹 [`proxy`](https://github.com/JitendraSachwani/dockyard/tree/proxy)
 
 This branch includes the configuration for a **remote VPS** that acts as a **Pangolin Reverse Proxy** to securely expose services from the HomeLab to the public internet.
 
@@ -36,6 +36,18 @@ This branch includes the configuration for a **remote VPS** that acts as a **Pan
 This setup ensures secure and flexible remote access to HomeLab services.
 
 ## 
+
+### 🔹 [`workstation`](https://github.com/JitendraSachwani/dockyard/tree/workstation)
+
+This branch contains the setup for my primary **Windows Workstation** — primarily used for gaming and personal projects. It includes:
+
+- Custom Rainmeter configuration
+- Curated wallpaper collection
+- Organized workspace base folder structure
+- Handy macros and automation scripts
+
+##
+
 
 ## 🛠️ Getting Started
 
