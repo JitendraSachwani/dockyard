@@ -1,66 +1,57 @@
-# ⚓ Dockyard - Docker Setups Repository 🐳
+# 💻 Workstation
 
-Welcome to my ⚓ **Dockyard** 🐳
+Welcome to the **`workstation`** branch of the ⚓ Dockyard — the configuration for my primary Windows PC, used for both gaming and personal projects.
 
-This is a centralized harbor for managing multiple Docker-based environments across my infrastructure.
+This branch contains the customization, assets, and automation that make my daily workflow smooth and my setup visually appealing. From Rainmeter dashboards to handy macros, it's all here in one place.
 
-This repository **uses branches** to organize different setups, while the `master` branch serves as a placeholder and reference point with documentation only.
+## 
+
+## 📦 What's Inside?
+
+| Folder          | Purpose                                                                         |
+| --------------- | ------------------------------------------------------------------------------- |
+| **Macros/**     | Useful keyboard and mouse automation scripts for gaming and productivity        |
+| **Rainmeter/**  | Custom Rainmeter skins and configurations for system stats, clocks, and widgets |
+| **Tools/**      | Handy utilities, scripts, and installers for quick system setup                 |
+| **Wallpapers/** | Curated wallpaper collection for multi-monitor and ultrawide setups             |
+| **Workspace/**  | Base folder structure template for organizing projects and files                |
 
 ##
 
-## 📂 Branch Structure
+## ⚙️ Getting Started
 
-### 🔹 [`homelab`](https://github.com/JitendraSachwani/mediaserver/tree/homelab)
-
-This branch contains the **HomeLab** setup — a self-hosted media server stack using Docker Compose. It includes:
-
-- Portainer for container management
-- Transmission / qBittorrent for downloads
-- Radarr / Sonarr / Lidarr for automated content management
-- Tautulli for media stats and analytics
-- Watchtower for auto-updates
-- Plex / Jellyfin for media streaming
-
-Perfect for creating your own private media server running on a Raspberry Pi, NUC, or other home hardware.
-
-## 
-
-### 🔹 [`proxy`](https://github.com/JitendraSachwani/mediaserver/tree/proxy)
-
-This branch includes the configuration for a **remote VPS** that acts as a **Pangolin Reverse Proxy** to securely expose services from the HomeLab to the public internet.
-
-- Pangolin for reverse proxying and TLS termination
-- Fail2ban & UFW for basic security
-- Dockerized setup for easy deployment on a low-cost VPS
-
-This setup ensures secure and flexible remote access to HomeLab services.
-
-## 
-
-## 🛠️ Getting Started
-
-To use any of these setups clone the specific dockyard branch:
+Clone only this branch:
 
 ```bash
-git clone --single-branch --branch <dockyard_branch_name> https://github.com/JitendraSachwani/dockyard.git <local_folder_name>
+git clone --single-branch --branch workstation https://github.com/JitendraSachwani/dockyard.git workstation
+cd workstation
 ```
 
-Replace <dockyard_branch_name> with one of above mentioned branches and optionally specify a <local_folder_name> if you want to rename the directory locally.
+##
 
-## 
+## 📌 Prerequisites
 
-## 🧭 Why Branch-Based?
+- Windows 11
 
-Using branches allows:
+- Any preferred development tools for your projects
 
-- Modular and independent setups
+##
 
-- Clean separation of environments
+## 🚀 Usage
 
-- Easier testing, collaboration, and version control
+- Reference **Macros/** scripts into their corresponding software and activate them.
 
-## 
+- Import **Rainmeter/** skins into Rainmeter and use its config to your dashboard.
 
-## 📬 Feedback & Contributions
+- Copy **Wallpapers/** images to your preferred folder or set them as your wallpaper directly.
 
-This is a personal project, but feel free to fork it, open issues, or suggest improvements. If you're running something similar, I’d love to hear how you’ve set yours up too!
+- Use **Workspace/** as a starting point for organizing new projects.
+
+##
+
+## 🤝 Contribute & Customize
+
+This is a personal project, but you're welcome to fork it and adapt it to your needs. If you have ideas or improvements, feel free to open a pull request. I'd love to see them.
+
+> **Happy Computing!** 🖥️  
+> _– Jitendra Sachwani_
