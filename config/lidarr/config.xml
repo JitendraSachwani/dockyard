@@ -4,7 +4,7 @@
   <SslPort>6868</SslPort>
   <EnableSsl>False</EnableSsl>
   <LaunchBrowser>True</LaunchBrowser>
-  <ApiKey>8ccfd4f4183048d79c3e09a928b61d8d</ApiKey>
+  <ApiKey>ADD_ARR_SUITE_API_KEY_HERE</ApiKey>
   <!-- Set to External for use with Pangolin, Set to None in other cases -->
   <AuthenticationMethod>External</AuthenticationMethod>
   <AuthenticationRequired>Enabled</AuthenticationRequired>

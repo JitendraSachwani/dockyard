@@ -2,14 +2,15 @@ version: "3.8"
 
 x-timezone-env-var: &timezone-env-var TZ=Etc/UTC
 
-x-common-media-volume: &common-media-volume /media/mediaserver:/media
+x-common-vol-arr-custom-init: &common-vol-arr-custom-init ./config/arr-suite/custom-cont-init.d:/custom-cont-init.d:ro
 
-x-common-download-volume: &common-download-volume /media/mediaserver/MediaShare/Downloads:/downloads
+x-common-vol-media: &common-vol-media /media/mediaserver:/media
+
+x-common-vol-downloads: &common-vol-downloads /media/mediaserver/MediaShare/Downloads:/downloads
 
 x-common-config: &common-config
   networks:
     - bridge_net_1
-  # user: 1000:1000
   profiles:
     - prod
   restart: unless-stopped
@@ -19,6 +20,11 @@ x-common-config: &common-config
       max-size: 10m
       max-file: "3"
 
+x-arr-common-config: &arr-common-config
+  <<: *common-config
+  user: 1000:1000
+    
+
 services:
   dnsmasq:
     image: dockurr/dnsmasq
@@ -27,12 +33,16 @@ services:
     restart: unless-stopped
     cap_add:
       - NET_ADMIN
+    environment:
+      TZ: ${TZ}
     volumes:
       - ./config/dnsmasq/dnsmasq.conf:/etc/dnsmasq.conf:ro
   redis: # Runs on port 6379
     image: redis:alpine
     hostname: authentik-redis
     <<: *common-config
+    environment:
+      TZ: ${TZ}
     volumes:
       - ./config/databases/redis/data:/data
     healthcheck:
@@ -49,7 +59,8 @@ services:
       redis:
         condition: service_healthy
     environment:
-      - REDIS_URI=redis://redis:6379
+      TZ: ${TZ}
+      REDIS_URI: "redis://redis:6379"
     volumes:
       - ./config/redis-insight:/data
   postgres: # Runs on port 5432
@@ -57,6 +68,7 @@ services:
     hostname: postgres
     <<: *common-config
     environment:
+      TZ: ${TZ}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
@@ -71,11 +83,12 @@ services:
     image: dpage/pgadmin4
     hostname: pgadmin
     <<: *common-config
-    user: "$UID:$GID"
+    # user: "$UID:$GID"
     depends_on:
       postgres:
         condition: service_healthy
     environment:
+      TZ: ${TZ}
       PGADMIN_DEFAULT_EMAIL: admin@localserver.stream
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
     volumes:
@@ -124,52 +137,55 @@ services:
     image: vaultwarden/server:latest
     hostname: vaultwarden
     <<: *common-config
+    environment:
+      TZ: ${TZ}
+      ADMIN_TOKEN: ${VAULT_ADMIN_TOKEN}
+      WEBSOCKET_ENABLED: "true" # Enable WebSocket notifications
+      SIGNUPS_ALLOWED: "false"
     volumes:
       - ./config/vaultwarden/data:/data
-    environment:
-      - ADMIN_TOKEN=${VAULT_ADMIN_TOKEN}
-      - WEBSOCKET_ENABLED=true # Enable WebSocket notifications
-      - SIGNUPS_ALLOWED=false
   nzbget:
     image: lscr.io/linuxserver/nzbget:latest
     hostname: nzbget
     <<: *common-config
-    profiles: ["dev"]
+    profiles: ["unstable"]
     user: 1000:1000
     environment:
-      - *timezone-env-var
-      - NZBGET_USER=mediaserver
-      - NZBGET_PASS=pass@123
+      TZ: ${TZ}
+      NZBGET_USER: mediaserver
+      NZBGET_PASS: pass@123
     volumes:
+      - *common-vol-downloads
       - ./config/nzbget:/config
-      - *common-download-volume
     networks:
       - bridge_net_1
-    ports:
-      - 7003:6789
+    # ports:
+    #   - 7003:6789
   qbittorrent: # Runs on port 8080 (Web UI) and 6881 (Torrent Client)
     image: lscr.io/linuxserver/qbittorrent:latest
     hostname: qbittorrent
     <<: *common-config
     user: 1000:1000
     environment:
-      - *timezone-env-var
-      - WEBUI_PORT=8080
+      TZ: ${TZ}
+      # WEBUI_PORT: 8080
     volumes:
+      - *common-vol-downloads
       - ./config/qbittorrent:/config
-      - *common-download-volume
-    ports:
-      - 8080:8080
-      - 6881:6881/tcp
-      - 6881:6881/udp
+    # ports:
+    #   - 8080:8080
+    #   - 6881:6881/tcp
+    #   - 6881:6881/udp
   prowlarr: # Runs on port 9696
     image: linuxserver/prowlarr:latest
     hostname: prowlarr
     <<: *common-config
     user: 1000:1000
     environment:
-      - *timezone-env-var
+      TZ: ${TZ}
+      ARR_SUITE_COMMON_API_KEY: ${ARR_SUITE_COMMON_API_KEY}
     volumes:
+      - *common-vol-arr-custom-init
       - ./config/prowlarr:/config
     depends_on:
     #   - nzbget
@@ -180,11 +196,13 @@ services:
     <<: *common-config
     user: 1000:1000
     environment:
-      - *timezone-env-var
+      TZ: ${TZ}
+      ARR_SUITE_COMMON_API_KEY: ${ARR_SUITE_COMMON_API_KEY}
     volumes:
+      - *common-vol-arr-custom-init
+      - *common-vol-downloads
+      - *common-vol-media
       - ./config/radarr:/config
-      - *common-download-volume
-      - *common-media-volume
     depends_on:
       - prowlarr
   sonarr: # Runs on port 8989
@@ -193,25 +211,28 @@ services:
     <<: *common-config
     user: 1000:1000
     environment:
-      - *timezone-env-var
+      TZ: ${TZ}
+      ARR_SUITE_COMMON_API_KEY: ${ARR_SUITE_COMMON_API_KEY}
     volumes:
+      - *common-vol-arr-custom-init
+      - *common-vol-downloads
+      - *common-vol-media
       - ./config/sonarr:/config
-      - *common-download-volume
-      - *common-media-volume
     depends_on:
       - prowlarr
   bazarr: # [DEV] Runs on port 6767
     image: lscr.io/linuxserver/bazarr:latest
     hostname: bazarr
     <<: *common-config
-    profiles: ["dev"]
     user: 1000:1000
     environment:
-      - *timezone-env-var
+      TZ: ${TZ}
+      ARR_SUITE_COMMON_API_KEY: ${ARR_SUITE_COMMON_API_KEY}
     volumes:
+      - *common-vol-arr-custom-init
+      - *common-vol-downloads
+      - *common-vol-media
       - ./config/bazarr:/config
-      - *common-download-volume
-      - *common-media-volume
     depends_on:
       - radarr
       - sonarr
@@ -221,11 +242,13 @@ services:
     <<: *common-config
     user: 1000:1000
     environment:
-      - *timezone-env-var
+      TZ: ${TZ}
+      ARR_SUITE_COMMON_API_KEY: ${ARR_SUITE_COMMON_API_KEY}
     volumes:
-      - ./config/lidarr:/config
-      - *common-download-volume
-      - *common-media-volume
+      - *common-vol-arr-custom-init
+      - *common-vol-downloads
+      - *common-vol-media
+      - ./config/lidarr:/config 
     depends_on:
       - prowlarr
   readarr: # Runs on port 8787
@@ -234,11 +257,13 @@ services:
     <<: *common-config
     user: 1000:1000
     environment:
-      - *timezone-env-var
+      TZ: ${TZ}
+      ARR_SUITE_COMMON_API_KEY: ${ARR_SUITE_COMMON_API_KEY}
     volumes:
+      - *common-vol-arr-custom-init
+      - *common-vol-downloads
+      - *common-vol-media
       - ./config/readarr:/config
-      - *common-download-volume
-      - *common-media-volume
     depends_on:
       - prowlarr
   jellyfin: # Runs on port 8096 (HTTP) & 8920 (HTTPS)
@@ -249,10 +274,10 @@ services:
       bridge_net_1:
         ipv4_address: 172.30.1.3
     environment:
-      - *timezone-env-var
+      TZ: ${TZ}
     volumes:
       - ./config/jellyfin/config:/config
-      - *common-media-volume
+      - *common-vol-media
     ports:
       - 80:8096
     depends_on:
@@ -263,7 +288,7 @@ services:
     <<: *common-config
     user: 1000:1000
     environment:
-      - *timezone-env-var
+      TZ: ${TZ}
     volumes:
       - ./config/jellyseerr:/app/config
     depends_on:
@@ -276,15 +301,15 @@ services:
     <<: *common-config
     user: 1000:1000
     environment:
-      - *timezone-env-var
-      - ALLOW_SIGNUP=false
-      - BASE_URL=https://mealie.localserver.stream
-      - DB_ENGINE=postgres
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_SERVER=postgres
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=mealie
+      TZ: ${TZ}
+      ALLOW_SIGNUP: "false"
+      BASE_URL: "https://mealie.localserver.stream"
+      DB_ENGINE: "postgres"
+      POSTGRES_USER: "${POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_SERVER: "postgres"
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: "mealie"
     volumes:
       - ./config/mealie/appdata:/app/data/
     depends_on:
@@ -296,39 +321,7 @@ services:
           memory: 500M
     ports:
       - 9000:9000
-  homarr:
-    image: ghcr.io/homarr-labs/homarr:latest
-    hostname: homarr
-    <<: *common-config
-    profiles: ["dev"]
-    environment:
-      - SECRET_ENCRYPTION_KEY=${HOMARR_ENC_KEY}
-    volumes:
-      - ./custom_entrypoint.sh/:/data/
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./config/homarr/appdata:/appdata
-    networks:
-      - bridge_net_1
-    ports:
-      - "8080:7575"
-  # the-market-diary:
-  #   image: ghcr.io/jitendrasachwani/jitendrasachwani/the-market-diary:latest
-  #   hostname: the-market-diary
-  #   <<: *common-config
-  #   user: 1000:1000
-  #   environment:
-  #     - DOCKER_REGISTRY_USERNAME=${DOCKER_REGISTRY_USERNAME}
-  #     - DOCKER_REGISTRY_PASSWORD=${DOCKER_REGISTRY_PASSWORD}
-  #     - *timezone-env-var
-  #     - NODE_ENV=production
-  #   volumes:
-  #     - ../the-market-diary/public/videos:/app/public/videos
-  #     - ../the-market-diary/out/bundle:/app/out/bundle
-  #   networks:
-  #     - bridge_net_1
-  #   ports:
-  #     - "3000:3000"
-  #     - "3001:3001"
+  
 
   # ALWAYS KEEP THIS AS THE LAST SERVICE IN THE FILE AND ADD ALL DEPENDENCIES IN THE DEPENDS_ON SECTION
   newt:
