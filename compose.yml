@@ -20,6 +20,15 @@ x-common-config: &common-config
       max-file: "3"
 
 services:
+  dnsmasq:
+    image: dockurr/dnsmasq
+    container_name: dnsmasq
+    network_mode: "host"  # Needed so it can bind to port 53 on host
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - ./config/dnsmasq/dnsmasq.conf:/etc/dnsmasq.conf:ro
   redis: # Runs on port 6379
     image: redis:alpine
     hostname: authentik-redis
@@ -236,13 +245,18 @@ services:
     image: lscr.io/linuxserver/jellyfin:latest
     hostname: jellyfin
     <<: *common-config
+    networks:
+      bridge_net_1:
+        ipv4_address: 172.30.1.3
     environment:
       - *timezone-env-var
     volumes:
       - ./config/jellyfin/config:/config
       - *common-media-volume
     ports:
-      - 8000:8096
+      - 80:8096
+    depends_on:
+      - dnsmasq
   jellyseerr: # Runs on port 5055
     image: fallenbagel/jellyseerr:latest
     hostname: jellyseerr
@@ -331,7 +345,7 @@ services:
         - redis-insight
         - pgadmin
         - vaultwarden
-        - nzbget
+        # - nzbget
         - qbittorrent
         - prowlarr
         - radarr
@@ -348,3 +362,6 @@ networks:
   bridge_net_1:
     driver: bridge
     attachable: true
+    ipam:
+      config:
+        - subnet: 172.30.0.0/16

@@ -112,6 +112,10 @@ DOCKER_REGISTRY_PASSWORD=your_registry_pass
 Run all the services using:
 
 ```bash
+# Set a Static IP (192.168.1.53) via GUI or use the following commands
+nmcli connection modify "Wired connection 1" ipv4.method manual ipv4.addresses 192.168.1.53/24 ipv4.gateway 192.168.1.1 ipv4.dns "8.8.8.8 1.1.1.1"
+nmcli connection down "Wired connection 1" && nmcli connection up "Wired connection 1"
+
 docker compose up -d
 ```
 
