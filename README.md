@@ -8,7 +8,7 @@ This setup is designed for tech-savvy enthusiasts running on **Raspberry Pi**, *
 
 ## 📦 What's Inside?
 
-This stack includes a full suite of tools for
+This Docker Compose stack includes a full suite of tools for
 
 ### 📥 Download Automation
 
@@ -67,7 +67,7 @@ This stack includes a full suite of tools for
 Clone only this branch:
 
 ```bash
-git clone --single-branch --branch homelab https://github.com/JitendraSachwani/mediaserver.git homelab
+git clone --single-branch --branch homelab https://github.com/JitendraSachwani/dockyard.git homelab
 cd homelab
 ```
 
