@@ -1,0 +1,98 @@
+version: "3.9"
+
+name: nas
+
+x-common-config: &common-config
+  restart: unless-stopped
+  env_file: .env
+  networks:
+    - db_net
+  # deploy:
+  #   restart_policy:
+  #     condition: on-failure
+  logging:
+    driver: "json-file"
+    options:
+      max-size: 10m
+      max-file: "3"
+
+services:
+  mongo_db:
+    image: mongo:8
+    container_name: mongo_db
+    <<: *common-config
+    environment:
+      - TZ=${TZ}
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+    volumes:
+      - ./databases/mongo/backups:/backups
+      - ./databases/mongo/data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand('ping').ok"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  mysql_db:
+    image: mysql:8.4
+    container_name: mysql_db
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - TZ=${TZ}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    volumes:
+      - ./databases/mysql/backups:/backups
+      - ./databases/mysql/conf.d:/etc/mysql/conf.d
+      - ./databases/mysql/data:/var/lib/mysql
+    networks:
+      - db_net
+
+  postgres_db:
+    image: postgres:17
+    container_name: postgres_db
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    command: ["postgres", "-c", "timezone=${TZ}"]
+    volumes:
+      - ./databases/postgres/backups:/backups
+      - ./databases/postgres/data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+  redis_db:
+    image: redis:7.4
+    container_name: redis_db
+    environment:
+      TZ: ${TZ}
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "yes",
+        "--requirepass",
+        "${REDIS_PASSWORD}",
+      ]
+    volumes:
+      - ./databases/redis/data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  db_net:
+    driver: overlay
+    attachable: true

@@ -1,78 +1,155 @@
-# ⚓ Dockyard - Docker Setups Repository 🐳
+# 🧱 Dockyard: NAS Stack ⚓
 
-Welcome to my ⚓ **Dockyard** 🐳
+Welcome to the **NAS branch** of [⚓ Dockyard](https://github.com/JitendraSachwani/dockyard) — the backbone of your NAS infrastructure, acting as a **centralized data and database host** for your HomeLab.
 
-This is a centralized harbor for managing multiple Docker-based environments across my infrastructure.
-
-This repository **uses branches** to organize different setups, while the `master` branch serves as a placeholder and reference point with documentation only.
+This stack is designed to provide **secure, isolated, and maintainable database services** across multiple hosts using **Docker Swarm** and **overlay networking** — without exposing any ports on the NAS itself.
 
 ##
 
-## 📂 Branch Structure
+## 📦 What's Inside?
 
-### 🔹 [`homelab`](https://github.com/JitendraSachwani/dockyard/tree/homelab)
+This NAS setup includes a **multi-database stack**, each running as a service in Docker:
 
-This branch contains the **HomeLab** setup — a self-hosted media server stack using Docker Compose. It includes:
+### 🗄️ Database Services
 
-- Portainer for container management
-- Transmission / qBittorrent for downloads
-- Radarr / Sonarr / Lidarr for automated content management
-- Tautulli for media stats and analytics
-- Watchtower for auto-updates
-- Plex / Jellyfin for media streaming
+| Database       | Image         | Port            | Purpose                                   |
+| -------------- | ------------- | --------------- | ----------------------------------------- |
+| **MongoDB**    | `mongo:8`     | _internal only_ | NoSQL document store                      |
+| **MySQL**      | `mysql:8.4`   | _internal only_ | Relational database for apps and services |
+| **PostgreSQL** | `postgres:17` | _internal only_ | Advanced SQL database                     |
+| **Redis**      | `redis:7.4`   | _internal only_ | Caching, session storage, and queues      |
 
-Perfect for creating your own private media server running on a Raspberry Pi, NUC, or other home hardware.
-
-## 
-
-### 🔹 [`proxy`](https://github.com/JitendraSachwani/dockyard/tree/proxy)
-
-This branch includes the configuration for a **remote VPS** that acts as a **Pangolin Reverse Proxy** to securely expose services from the HomeLab to the public internet.
-
-- Pangolin for reverse proxying and TLS termination
-- Fail2ban & UFW for basic security
-- Dockerized setup for easy deployment on a low-cost VPS
-
-This setup ensures secure and flexible remote access to HomeLab services.
-
-## 
-
-### 🔹 [`workstation`](https://github.com/JitendraSachwani/dockyard/tree/workstation)
-
-This branch contains the setup for my primary **Windows Workstation** — primarily used for gaming and personal projects. It includes:
-
-- Custom Rainmeter configuration
-- Curated wallpaper collection
-- Organized workspace base folder structure
-- Handy macros and automation scripts
+Each service is part of a **shared overlay network (`db_net`)**, which allows other Docker hosts (e.g., backend servers) to access the databases securely _without exposing any host ports_.
 
 ##
 
+### 🧭 Networking Architecture
 
-## 🛠️ Getting Started
-
-To use any of these setups clone the specific dockyard branch:
-
-```bash
-git clone --single-branch --branch <dockyard_branch_name> https://github.com/JitendraSachwani/dockyard.git <local_folder_name>
+```mermaid
+graph LR
+    A[External Host(s)] -->|db_net overlay| B[NAS Host]
+    B --> Mongo[(MongoDB)]
+    B --> MySQL[(MySQL)]
+    B --> Postgres[(PostgreSQL)]
+    B --> Redis[(Redis)]
 ```
 
-Replace <dockyard_branch_name> with one of above mentioned branches and optionally specify a <local_folder_name> if you want to rename the directory locally.
+Communication happens entirely within the **Docker Swarm overlay network** `db_net`.  
+No direct database ports (27017, 3306, 5432, 6379) are published to the NAS host.
 
-## 
+##
 
-## 🧭 Why Branch-Based?
+## ⚙️ Getting Started
 
-Using branches allows:
+### 📌 Prerequisites
 
-- Modular and independent setups
+- Docker + Docker Compose
 
-- Clean separation of environments
+- `.env` file with secrets
 
-- Easier testing, collaboration, and version control
+##
 
-## 
+### 🔐 `.env` Configuration
 
-## 📬 Feedback & Contributions
+The `.env` file is excluded from Git and contains your database credentials and defaults.
 
-This is a personal project, but feel free to fork it, open issues, or suggest improvements. If you're running something similar, I’d love to hear how you’ve set yours up too!
+Example:
+
+```bash
+COMPOSE_PROFILES=prod
+TZ=Asia/Kolkata
+
+# MySQL
+MYSQL_ROOT_PASSWORD=changeme
+MYSQL_DATABASE=appdb
+MYSQL_USER=appuser
+MYSQL_PASSWORD=apppass
+
+# PostgreSQL
+POSTGRES_PASSWORD=changeme
+POSTGRES_USER=appuser
+POSTGRES_DB=appdb
+
+# MongoDB
+MONGO_INITDB_ROOT_USERNAME=root
+MONGO_INITDB_ROOT_PASSWORD=changeme
+
+```
+
+##
+
+### 🚀 Deployment
+
+#### 1️⃣ Clone only this branch:
+
+```bash
+git clone --single-branch --branch nas https://github.com/JitendraSachwani/dockyard.git homelab
+cd nas
+```
+
+#### 2️⃣ Initialize Docker Swarm
+
+```bash
+docker swarm init --advertise-addr <NAS_LAN_IP>
+```
+
+#### 3️⃣ Create the Shared Overlay Network
+
+```bash
+docker network create --driver overlay --attachable db_net
+```
+
+#### 4️⃣ Get the Join Token (for external hosts)
+
+```bash
+docker swarm join-token worker
+```
+
+Copy the `docker swarm join ...` command and run it on your external host(s).
+
+#### 5️⃣ Deploy the Stack
+
+```bash
+docker stack deploy -c compose.yml nas
+```
+
+Or, if you prefer standalone Compose:
+
+```bash
+docker compose up -d
+```
+
+##
+
+### 🧠 Access from Other Hosts
+
+Once your backend host has joined the Swarm (`docker swarm join ...`):
+
+Launch your backend container and attach it to the same overlay network:
+
+```bash
+docker run -d --name app --network db_net myapp:latest
+```
+
+Then, inside that container, you can connect via:
+
+MongoDB → `mongo_db:27017`
+
+MySQL → `mysql_db:3306`
+
+PostgreSQL → `postgres_db:5432`
+
+Redis → `redis_db:6379`
+
+✅ No host ports exposed
+
+✅ Secure, internal-only traffic
+
+##
+
+## 🤝 Contribute & Customize
+
+This is a personal project, but you're welcome to fork it and adapt it to your needs. If you have ideas or improvements, feel free to open a pull request.
+
+> **Happy Self-Hosting!** 🐳  
+> _– Jitendra Sachwani_
