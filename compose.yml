@@ -4,9 +4,9 @@ x-timezone-env-var: &timezone-env-var TZ=Etc/UTC
 
 x-common-vol-arr-custom-init: &common-vol-arr-custom-init ./config/arr-suite/custom-cont-init.d:/custom-cont-init.d:ro
 
-x-common-vol-media: &common-vol-media /media/mediaserver:/media
+x-common-vol-media: &common-vol-media /media:/media
 
-x-common-vol-downloads: &common-vol-downloads /media/mediaserver/MediaShare/Downloads:/downloads
+x-common-vol-downloads: &common-vol-downloads /media/Downloads:/downloads
 
 x-common-config: &common-config
   networks:
@@ -20,16 +20,11 @@ x-common-config: &common-config
       max-size: 10m
       max-file: "3"
 
-x-arr-common-config: &arr-common-config
-  <<: *common-config
-  user: 1000:1000
-    
-
 services:
   dnsmasq:
     image: dockurr/dnsmasq
     container_name: dnsmasq
-    network_mode: "host"  # Needed so it can bind to port 53 on host
+    network_mode: "host" # Needed so it can bind to port 53 on host
     restart: unless-stopped
     cap_add:
       - NET_ADMIN
@@ -80,19 +75,37 @@ services:
       timeout: 20s
       retries: 3
   pgadmin: # Runs on port 80
-    image: dpage/pgadmin4
+    image: dpage/pgadmin4:latest
     hostname: pgadmin
     <<: *common-config
-    # user: "$UID:$GID"
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       TZ: ${TZ}
-      PGADMIN_DEFAULT_EMAIL: admin@localserver.stream
+      PGADMIN_DEFAULT_EMAIL: ${ADMIN_EMAIL}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
     volumes:
       - ./config/pgadmin/data:/var/lib/pgadmin
+  traefik: # Runs on port 80 (HTTP) and 443 (HTTPS)
+    image: "traefik"
+    hostname: "traefik"
+    <<: *common-config
+    profiles: ["dev"]
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.mytlschallenge.acme.tlschallenge=true"
+      - "--certificatesresolvers.mytlschallenge.acme.email=${SSL_EMAIL}"
+      - "--certificatesresolvers.mytlschallenge.acme.storage=/letsencrypt/acme.json"
+    volumes:
+      - ./config/traefik/letsencrypt:/letsencrypt
+      - /var/run/docker.sock:/var/run/docker.sock:ro
   authentik-server: # Runs on port 9000 (Web UI) and 9443 (Https Web UI)
     image: ghcr.io/goauthentik/server:latest
     hostname: authentik-server
@@ -144,7 +157,35 @@ services:
       SIGNUPS_ALLOWED: "false"
     volumes:
       - ./config/vaultwarden/data:/data
-  nzbget:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    hostname: n8n
+    <<: *common-config
+    environment:
+      TZ: ${TZ}
+      GENERIC_TIMEZONE: ${TZ}
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
+      N8N_HOST: "n8n.${DOMAIN_NAME}"
+      N8N_PORT: 5678
+      N8N_PROTOCOL: https
+      N8N_RUNNERS_ENABLED: "true"
+      NODE_ENV: production
+      WEBHOOK_URL: "https://n8n.${DOMAIN_NAME}"
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_DATABASE: n8n
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_USER: ${POSTGRES_USER}
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
+      N8N_BASIC_AUTH_ACTIVE: true
+      N8N_BASIC_AUTH_USER: ${ADMIN_EMAIL}
+      N8N_BASIC_AUTH_PASSWORD: pass@123
+    volumes:
+      - ./config/n8n/data:/home/node/.n8n
+      - ./config/n8n/shared-files:/files
+    ports:
+      - 8000:5678
+  nzbget: # Runs on port 6789
     image: lscr.io/linuxserver/nzbget:latest
     hostname: nzbget
     <<: *common-config
@@ -159,8 +200,6 @@ services:
       - ./config/nzbget:/config
     networks:
       - bridge_net_1
-    # ports:
-    #   - 7003:6789
   qbittorrent: # Runs on port 8080 (Web UI) and 6881 (Torrent Client)
     image: lscr.io/linuxserver/qbittorrent:latest
     hostname: qbittorrent
@@ -168,14 +207,10 @@ services:
     user: 1000:1000
     environment:
       TZ: ${TZ}
-      # WEBUI_PORT: 8080
+      WEBUI_PORT: 8080
     volumes:
       - *common-vol-downloads
       - ./config/qbittorrent:/config
-    # ports:
-    #   - 8080:8080
-    #   - 6881:6881/tcp
-    #   - 6881:6881/udp
   prowlarr: # Runs on port 9696
     image: linuxserver/prowlarr:latest
     hostname: prowlarr
@@ -188,7 +223,7 @@ services:
       - *common-vol-arr-custom-init
       - ./config/prowlarr:/config
     depends_on:
-    #   - nzbget
+      #   - nzbget
       - qbittorrent
   radarr: # Runs on port 7878
     image: lscr.io/linuxserver/radarr:latest
@@ -200,8 +235,8 @@ services:
       ARR_SUITE_COMMON_API_KEY: ${ARR_SUITE_COMMON_API_KEY}
     volumes:
       - *common-vol-arr-custom-init
-      - *common-vol-downloads
       - *common-vol-media
+      - *common-vol-downloads
       - ./config/radarr:/config
     depends_on:
       - prowlarr
@@ -215,8 +250,8 @@ services:
       ARR_SUITE_COMMON_API_KEY: ${ARR_SUITE_COMMON_API_KEY}
     volumes:
       - *common-vol-arr-custom-init
-      - *common-vol-downloads
       - *common-vol-media
+      - *common-vol-downloads
       - ./config/sonarr:/config
     depends_on:
       - prowlarr
@@ -230,8 +265,8 @@ services:
       ARR_SUITE_COMMON_API_KEY: ${ARR_SUITE_COMMON_API_KEY}
     volumes:
       - *common-vol-arr-custom-init
-      - *common-vol-downloads
       - *common-vol-media
+      - *common-vol-downloads
       - ./config/bazarr:/config
     depends_on:
       - radarr
@@ -246,9 +281,9 @@ services:
       ARR_SUITE_COMMON_API_KEY: ${ARR_SUITE_COMMON_API_KEY}
     volumes:
       - *common-vol-arr-custom-init
-      - *common-vol-downloads
       - *common-vol-media
-      - ./config/lidarr:/config 
+      - *common-vol-downloads
+      - ./config/lidarr:/config
     depends_on:
       - prowlarr
   readarr: # Runs on port 8787
@@ -261,8 +296,8 @@ services:
       ARR_SUITE_COMMON_API_KEY: ${ARR_SUITE_COMMON_API_KEY}
     volumes:
       - *common-vol-arr-custom-init
-      - *common-vol-downloads
       - *common-vol-media
+      - *common-vol-downloads
       - ./config/readarr:/config
     depends_on:
       - prowlarr
@@ -295,7 +330,7 @@ services:
       - jellyfin
       - radarr
       - sonarr
-  mealie: # Runs on port 9000 
+  mealie: # Runs on port 9000
     image: ghcr.io/mealie-recipes/mealie:v3.0.2
     hostname: mealie
     <<: *common-config
@@ -321,7 +356,21 @@ services:
           memory: 500M
     ports:
       - 9000:9000
-  
+  discord-sbal: # Runs on port 5000
+    build:
+      context: ../discord/discord-sbal
+      dockerfile: Dockerfile
+    image: discord-sbal:latest
+    hostname: discord-sbal
+    <<: *common-config
+    user: 1000:1000
+    environment:
+      - TZ=${TZ}
+    volumes:
+      - ./config/discord/sbal/data:/app/data
+      - ./config/discord/sbal/.env:/app/.env:ro
+    ports:
+      - "5000:5000"
 
   # ALWAYS KEEP THIS AS THE LAST SERVICE IN THE FILE AND ADD ALL DEPENDENCIES IN THE DEPENDS_ON SECTION
   newt:
@@ -335,20 +384,20 @@ services:
       - LOG_LEVEL=DEBUG
     # TODO: Test all one by one and uncomment
     depends_on:
-        - redis-insight
-        - pgadmin
-        - vaultwarden
-        # - nzbget
-        - qbittorrent
-        - prowlarr
-        - radarr
-        - sonarr
-        # - bazarr
-        - lidarr
-        - readarr
-        - jellyseerr
-        - jellyfin
-        # - mealie
+      - redis-insight
+      - pgadmin
+      - vaultwarden
+      # - nzbget
+      - qbittorrent
+      - prowlarr
+      - radarr
+      - sonarr
+      # - bazarr
+      - lidarr
+      - readarr
+      - jellyseerr
+      - jellyfin
+      # - mealie
   # DO NOT ADD ANY SERVICES BELOW THE NEWT SERVICE, ADD THEM ABOVE THIS SERVICE IF NEEDED
 
 networks:
