@@ -10,11 +10,11 @@ This branch contains the customization, assets, and automation that make my dail
 
 | Folder          | Purpose                                                                         |
 | --------------- | ------------------------------------------------------------------------------- |
-| **Macros/**     | Useful keyboard and mouse automation scripts for gaming and productivity        |
-| **Rainmeter/**  | Custom Rainmeter skins and configurations for system stats, clocks, and widgets |
-| **Tools/**      | Handy utilities, scripts, and installers for quick system setup                 |
-| **Wallpapers/** | Curated wallpaper collection for multi-monitor and ultrawide setups             |
-| **Workspace/**  | Base folder structure template for organizing projects and files                |
+| **Macros/**     | Reference these macros into their corresponding software and activate them.     |
+| **Rainmeter/**  | Custom Rainmeter skins and their configurations for the dashboard.              |
+| **Tools/**      | Handy utilities, scripts, and installers for quick system setup.                |
+| **Wallpapers/** | Curated wallpaper collection for multi-monitor and ultrawide setups.            |
+| **Workspace/**  | Base folder structure template for organizing projects and files.               |
 
 ##
 
@@ -33,19 +33,7 @@ cd workstation
 
 - Windows 11
 
-- Any preferred development tools for your projects
-
-##
-
-## 🚀 Usage
-
-- Reference **Macros/** scripts into their corresponding software and activate them.
-
-- Import **Rainmeter/** skins into Rainmeter and use its config to your dashboard.
-
-- Copy **Wallpapers/** images to your preferred folder or set them as your wallpaper directly.
-
-- Use **Workspace/** as a starting point for organizing new projects.
+- Python
 
 ##
 
